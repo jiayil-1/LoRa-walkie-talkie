@@ -58,10 +58,11 @@ void init_pb_irq() {
 }
 
 void dma_init() {
-    
+    //set read/write addresses for DMA
     dma_hw->ch[0].read_addr = (uintptr_t)&adc_hw->fifo;
     dma_hw->ch[0].write_addr = (uintptr_t)&adc_fifo_out;
 
+    //configure DMA
     dma_hw->ch[0].transfer_count = (1u << 28) | 1u; //change to size
 
     uint32_t temp = 0;
@@ -73,9 +74,9 @@ void dma_init() {
 }
 
 void init_adc_dma() {
+    //initialize DMA and turn on ADC fifo
     dma_init();
     init_adc();
-    //adc_fifo_setup();
     adc_hw ->fcs =  ADC_FCS_EN_BITS |
                    ADC_FCS_DREQ_EN_BITS |
                    ADC_FCS_THRESH_BITS;
@@ -86,9 +87,7 @@ int main() {
     stdio_init_all();
     init_adc_dma();
     init_pb_irq();
-    //adc_run(true);
     
-    //init_pb_irq();
 
     // for(;;) {
     //     printf("ADC Result: %ld     \r", adc_hw->result);
