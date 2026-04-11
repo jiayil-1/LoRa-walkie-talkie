@@ -15,10 +15,12 @@
 // adc for mic pin -> rp2350
 // spi rp2350 -> lora pin
 
+volatile lora_state_t state = STATE_RX;
+
 void init_spi() {
     //initialize gpio pins
     uint32_t mask = (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
-    gpio_init_masked(mask);
+    gpio_init_mask(mask);
 
     //spi0 CSn
     gpio_set_function(17, GPIO_FUNC_SPI);
@@ -38,7 +40,9 @@ int main() {
     stdio_init_all();
     init_adc_dma();
     init_pb_irq();
+    //init_spi();
     
+    lora_init_default();
 
     // for(;;) {
     //     printf("ADC Result: %ld     \r", adc_hw->result);
@@ -46,12 +50,19 @@ int main() {
     //     sleep_ms(250);
     // }
     printf("Starting");
+    
     for(;;) {
+        //if(state == STATE_TX) {
+            
         float f = (adc_fifo_out * 3.3) / 4095.0;
         snprintf(buffer, sizeof(buffer), "%1.7f", f);
-    
+
         printf("%s \n", buffer);
+        lora_send_text("hi");
         sleep_ms(50);
+        //} else {
+        //}
+        
     }
 
     return 0;

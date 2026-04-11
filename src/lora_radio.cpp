@@ -13,15 +13,15 @@
 #endif
 
 #ifndef LORA_SPI_MISO_PIN
-#define LORA_SPI_MISO_PIN 4
+#define LORA_SPI_MISO_PIN 20
 #endif
 
 #ifndef LORA_SPI_MOSI_PIN
-#define LORA_SPI_MOSI_PIN 3
+#define LORA_SPI_MOSI_PIN 19
 #endif
 
 #ifndef LORA_SPI_SCK_PIN
-#define LORA_SPI_SCK_PIN 2
+#define LORA_SPI_SCK_PIN 18
 #endif
 
 static PicoHal *g_hal = nullptr;
@@ -58,12 +58,12 @@ extern "C" int16_t lora_radio_begin_with_pins(int8_t cs_pin,
     g_hal = new PicoHal(LORA_SPI_PORT, LORA_SPI_MISO_PIN, LORA_SPI_MOSI_PIN, LORA_SPI_SCK_PIN);
 
     g_module = new Module(g_hal, cs_pin, dio1_pin, rst_pin, busy_pin);
-    g_radio = new SX1262(g_module);
+    g_radio = new SX1276(g_module);
 
     return g_radio->begin(frequency_mhz);
 }
 
-extern "C" int16_t lora_radio_transmit_bytes(const uint8_t *data, size_t length)
+extern "C" int16_t    lora_radio_transmit_bytes(const uint8_t *data, size_t length)
 {
     if (g_radio == nullptr)
     {
@@ -76,4 +76,32 @@ extern "C" int16_t lora_radio_transmit_bytes(const uint8_t *data, size_t length)
     }
 
     return g_radio->transmit(data, length);
+}
+
+// j 
+
+extern "C" int16_t rfm9x_begin_fsk(float freq, float br, float freqDev,
+                         float rxBw, int8_t power,
+                         uint16_t preambleLength) {
+    return g_radio->beginFSK(freq, br, freqDev, rxBw, power, preambleLength, false);
+}
+
+extern "C" int16_t rfm9x_start_receive(void) {
+    return g_radio->startReceive();
+}
+
+extern "C" int16_t rfm9x_read_data(uint8_t *buf, size_t len) {
+    return g_radio->readData(buf, len);
+}
+
+extern "C" size_t rfm9x_get_packet_length(void) {
+    return g_radio->getPacketLength();
+}
+
+extern "C" int16_t rfm9x_start_transmit(const uint8_t *data, size_t len) {
+    return g_radio->startTransmit(data, len);
+}
+
+extern "C" int16_t rfm9x_finish_transmit(void) {
+    return g_radio->finishTransmit();
 }

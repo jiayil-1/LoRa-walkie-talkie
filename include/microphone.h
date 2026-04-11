@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-extern uint32_t adc_fifo_out;
+extern uint16_t adc_fifo_out;
 extern char buffer[10];
 
 void init_adc();
