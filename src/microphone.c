@@ -73,3 +73,8 @@ void init_adc_dma() {
                    ADC_FCS_THRESH_BITS;
 }
 
+
+void lora_write() {
+    uint16_t data = adc_fifo_out;
+    spi_write16_blocking(spi0, &data, 1);
+}

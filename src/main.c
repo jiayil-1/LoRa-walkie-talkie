@@ -15,6 +15,24 @@
 // adc for mic pin -> rp2350
 // spi rp2350 -> lora pin
 
+void init_spi() {
+    //initialize gpio pins
+    uint32_t mask = (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20);
+    gpio_init_masked(mask);
+
+    //spi0 CSn
+    gpio_set_function(17, GPIO_FUNC_SPI);
+    //spi0 SCK
+    gpio_set_function(18, GPIO_FUNC_SPI);
+    //spi0 TX
+    gpio_set_function(19, GPIO_FUNC_SPI);
+    //spi0 RX
+    gpio_set_function(20, GPIO_FUNC_SPI);
+
+    //spi format
+    spi_init(spi0, 1000000); //1MHz
+    spi_set_format(spi0, 16, 0, 0, SPI_MSB_FIRST);
+}
 
 int main() {
     stdio_init_all();
