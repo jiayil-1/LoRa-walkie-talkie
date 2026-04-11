@@ -1,18 +1,16 @@
-#include "lora.h"
-#include <stdio.h>
-#include <string.h>
-#include "pico/stdlib.h"
-#include "hardware/timer.h"
-#include "hardware/irq.h"
-#include "hardware/adc.h"
-#include "hardware/regs/dma.h"
-#include <hardware/structs/dma.h>
+#include "include.h"
 
-
-
-
-void lora_write() {
-    uint16_t adc_fifo_out 
-    spi_write16_blocking(spi0, &packet, 1);
+int16_t lora_init_default(void)
+{
+    return lora_radio_begin_with_pins(17, 20, 21, 22, 915.0f);
 }
 
+int16_t lora_send_text(const char *text)
+{
+    if (text == NULL)
+    {
+        return -1;
+    }
+
+    return lora_radio_transmit_bytes((const uint8_t *)text, strlen(text));
+}
