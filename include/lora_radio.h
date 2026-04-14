@@ -19,6 +19,16 @@ extern "C"
 
     int16_t lora_init_default(void);
     int16_t lora_send_text(const char *text);
+    int16_t rfm9x_begin_fsk(float freq, float br, float freqDev,
+                         float rxBw, int8_t power,
+                         uint16_t preambleLength);
+    int16_t rfm9x_start_receive(void);
+    int16_t rfm9x_read_data(uint8_t *buf, size_t len);
+    size_t rfm9x_get_packet_length(void);
+    int16_t rfm9x_start_transmit(const uint8_t *data, size_t len);
+    int16_t rfm9x_finish_transmit(void);
+    void rfm9x_set_packet_sent_action(void (*callback)(void));
+    void rfm9x_clear_packet_sent_action(void);
 
 #ifdef __cplusplus
 }

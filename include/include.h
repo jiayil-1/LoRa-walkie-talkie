@@ -8,6 +8,8 @@
 #include <hardware/structs/dma.h>
 #include "hardware/spi.h"
 #include "hardware/gpio.h"
+#include "hardware/dma.h"
+#include "hardware/sync.h"
 
 #ifdef __cplusplus
 #include <RadioLib.h>

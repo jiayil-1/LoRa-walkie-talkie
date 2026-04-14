@@ -32,7 +32,7 @@ static const int16_t LORA_BRIDGE_ERR_NOT_INITIALIZED = -10000;
 static const int16_t LORA_BRIDGE_ERR_INVALID_ARGUMENT = -10001;
 
 extern "C" int16_t lora_radio_begin_with_pins(int8_t cs_pin,
-                                              int8_t dio1_pin,
+                                              int8_t dio0_pin,
                                               int8_t rst_pin,
                                               int8_t busy_pin,
                                               float frequency_mhz)
@@ -57,13 +57,13 @@ extern "C" int16_t lora_radio_begin_with_pins(int8_t cs_pin,
 
     g_hal = new PicoHal(LORA_SPI_PORT, LORA_SPI_MISO_PIN, LORA_SPI_MOSI_PIN, LORA_SPI_SCK_PIN);
 
-    g_module = new Module(g_hal, cs_pin, dio1_pin, rst_pin, busy_pin);
+    g_module = new Module(g_hal, cs_pin, dio0_pin, rst_pin, busy_pin);
     g_radio = new SX1276(g_module);
 
     return g_radio->begin(frequency_mhz);
 }
 
-extern "C" int16_t    lora_radio_transmit_bytes(const uint8_t *data, size_t length)
+extern "C" int16_t lora_radio_transmit_bytes(const uint8_t *data, size_t length)
 {
     if (g_radio == nullptr)
     {
@@ -104,4 +104,26 @@ extern "C" int16_t rfm9x_start_transmit(const uint8_t *data, size_t len) {
 
 extern "C" int16_t rfm9x_finish_transmit(void) {
     return g_radio->finishTransmit();
+}
+
+
+// Jere INTERRUPTS
+
+extern "C" void rfm9x_set_packet_sent_action(void (*callback)(void)) {
+    g_radio->setPacketSentAction(callback);
+}
+
+extern "C" void rfm9x_clear_packet_sent_action(void) {
+    g_radio->clearPacketSentAction();
+}
+
+
+// j recieve
+
+extern "C" void lora_receive_start() {
+    g_radio->startReceive();
+}
+
+extern "C" void lora_receive_stop() {
+    g_radio->standby();
 }

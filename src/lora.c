@@ -12,5 +12,5 @@ int16_t lora_send_text(const char *text)
         return -1;
     }
 
-    return lora_radio_transmit_bytes((const uint8_t *)text, 16);
+    return lora_radio_transmit_bytes((const uint8_t *)text, strlen(text));
 }
