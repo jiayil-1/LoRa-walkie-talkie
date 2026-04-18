@@ -31,6 +31,11 @@ static SX1276 *g_radio = nullptr;
 static const int16_t LORA_BRIDGE_ERR_NOT_INITIALIZED = -10000;
 static const int16_t LORA_BRIDGE_ERR_INVALID_ARGUMENT = -10001;
 
+int16_t lora_init_default(void)
+{
+    return lora_radio_begin_with_pins(17, 16, 21, 22, 433.0);
+}
+
 extern "C" int16_t lora_radio_begin_with_pins(int8_t cs_pin,
                                               int8_t dio0_pin,
                                               int8_t rst_pin,
@@ -117,6 +122,9 @@ extern "C" void rfm9x_clear_packet_sent_action(void) {
     g_radio->clearPacketSentAction();
 }
 
+extern "C" void rfm9x_set_packet_received_action(void (*isr)(void)) {
+    g_radio-> setPacketReceivedAction(isr);
+}
 
 // j recieve
 

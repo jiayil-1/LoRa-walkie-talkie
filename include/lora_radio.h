@@ -18,7 +18,6 @@ extern "C"
     int16_t lora_radio_transmit_bytes(const uint8_t *data, size_t length);
 
     int16_t lora_init_default(void);
-    int16_t lora_send_text(const char *text);
     int16_t rfm9x_begin_fsk(float freq, float br, float freqDev,
                          float rxBw, int8_t power,
                          uint16_t preambleLength);
@@ -28,6 +27,7 @@ extern "C"
     int16_t rfm9x_start_transmit(const uint8_t *data, size_t len);
     int16_t rfm9x_finish_transmit(void);
     void rfm9x_set_packet_sent_action(void (*callback)(void));
+    void rfm9x_set_packet_received_action(void (*isr)(void));
     void rfm9x_clear_packet_sent_action(void);
 
 #ifdef __cplusplus

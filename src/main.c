@@ -1,22 +1,12 @@
 #include "include.h"
 #include "microphone.h"
-//#include "lora.h"
-// #include <stdio.h>
-// #include <string.h>
-// #include "pico/stdlib.h"
-// #include "hardware/timer.h"
-// #include "hardware/irq.h"
-// #include "hardware/adc.h"
-// #include "hardware/regs/dma.h"
-// #include <hardware/structs/dma.h>
-// #include "microphone.c"
-// #include "lora.c"
+#include "speaker.h"
 
-// adc for mic pin -> rp2350
-// spi rp2350 -> lora pin
 
-volatile lora_state_t state = STATE_RX;
-#define CHUNK_SIZE 60
+
+// Set to 1 to bypass LoRa and just verify the mic -> ADC -> DMA path.
+// Prints min/max/avg of each chunk plus a few raw samples over USB serial.
+
 
 void init_spi() {
     //initialize gpio pins
@@ -37,46 +27,51 @@ void init_spi() {
     spi_set_format(spi0, 16, 0, 0, SPI_MSB_FIRST);
 }
 
-static volatile bool tx_done = true;
-
-void on_packet_sent(void) {
-    tx_done = true;
-}
-
 
 int main() {
     stdio_init_all();
     init_adc_dma();
     init_pb_irq();
+    tx_done = false;
+    rx_done = false;
+
     lora_init_default();
 
     int16_t status = rfm9x_begin_fsk(915.0, 300.0, 75.0, 250.0, 10, 16);
     if (status != 0) {
+        printf("bad lora init");
         return -1;
     }
 
-    rfm9x_set_packet_sent_action(on_packet_sent);
-    //rfm9x_start_receive();
+    rfm9x_set_packet_sent_action(packet_sent_isr);
+    //rfm9x_set_packet_received_action(packet_received_isr);
 
     printf("Starting");
-    
+    state = STATE_TX;
+
     for(;;) {
         //if(state == STATE_TX) {
-            //uint8_t sample = adc_fifo_out >> 4; // convert 12-bit to 8-bit
-            
-
-        uint8_t *chunk = adc_get_ready_chunk();
-        if (chunk != NULL && tx_done) {
+        if (tx_done && tx_enable) {
             tx_done = false;
-            int16_t rc = rfm9x_start_transmit(chunk, CHUNK_SIZE);
+
+            int16_t rc = rfm9x_start_transmit(&dma_buf[lora_read_ind], CHUNK_SIZE);
+            //printf("dma_);
             if (rc != 0) {
                 tx_done = true;   // allow retry on next chunk
                 printf("TX ERR: %d\n", rc);
             }
-            printf("TX: %02x %02x %02x %02x ...\n",
-               chunk[0], chunk[1], chunk[2], chunk[3]);
-        }
-        
+            
+        }/*
+        } else if(state == STATE_RX) {
+            if(rx_done) {
+                rx_done = false;
+                int16_t rc = rfm9x_start_receive();
+                if (rc != 0) {
+                    rx_done = true;   // allow retry on next chunk
+                    printf("RX ERR: %d\n", rc);
+                }
+            }
+        }*/
     }
 
     return 0;
