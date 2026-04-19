@@ -19,8 +19,9 @@ extern "C"
 
     int16_t lora_init_default(void);
     int16_t rfm9x_begin_fsk(float freq, float br, float freqDev,
-                         float rxBw, int8_t power,
-                         uint16_t preambleLength);
+                            float rxBw, int8_t power,
+                            uint16_t preambleLength);
+    int16_t rfm9x_get_version(void);
     int16_t rfm9x_start_receive(void);
     int16_t rfm9x_read_data(uint8_t *buf, size_t len);
     size_t rfm9x_get_packet_length(void);

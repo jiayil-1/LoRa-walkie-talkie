@@ -83,55 +83,74 @@ extern "C" int16_t lora_radio_transmit_bytes(const uint8_t *data, size_t length)
     return g_radio->transmit(data, length);
 }
 
-// j 
+// j
 
 extern "C" int16_t rfm9x_begin_fsk(float freq, float br, float freqDev,
-                         float rxBw, int8_t power,
-                         uint16_t preambleLength) {
+                                   float rxBw, int8_t power,
+                                   uint16_t preambleLength)
+{
     return g_radio->beginFSK(freq, br, freqDev, rxBw, power, preambleLength, false);
 }
 
-extern "C" int16_t rfm9x_start_receive(void) {
+extern "C" int16_t rfm9x_get_version(void)
+{
+    if (g_module == nullptr)
+    {
+        return LORA_BRIDGE_ERR_NOT_INITIALIZED;
+    }
+    return (int16_t)g_module->SPIreadRegister(0x42);
+}
+
+extern "C" int16_t rfm9x_start_receive(void)
+{
     return g_radio->startReceive();
 }
 
-extern "C" int16_t rfm9x_read_data(uint8_t *buf, size_t len) {
+extern "C" int16_t rfm9x_read_data(uint8_t *buf, size_t len)
+{
     return g_radio->readData(buf, len);
 }
 
-extern "C" size_t rfm9x_get_packet_length(void) {
+extern "C" size_t rfm9x_get_packet_length(void)
+{
     return g_radio->getPacketLength();
 }
 
-extern "C" int16_t rfm9x_start_transmit(const uint8_t *data, size_t len) {
+extern "C" int16_t rfm9x_start_transmit(const uint8_t *data, size_t len)
+{
     return g_radio->startTransmit(data, len);
 }
 
-extern "C" int16_t rfm9x_finish_transmit(void) {
+extern "C" int16_t rfm9x_finish_transmit(void)
+{
     return g_radio->finishTransmit();
 }
 
-
 // Jere INTERRUPTS
 
-extern "C" void rfm9x_set_packet_sent_action(void (*callback)(void)) {
+extern "C" void rfm9x_set_packet_sent_action(void (*callback)(void))
+{
     g_radio->setPacketSentAction(callback);
 }
 
-extern "C" void rfm9x_clear_packet_sent_action(void) {
+extern "C" void rfm9x_clear_packet_sent_action(void)
+{
     g_radio->clearPacketSentAction();
 }
 
-extern "C" void rfm9x_set_packet_received_action(void (*isr)(void)) {
-    g_radio-> setPacketReceivedAction(isr);
+extern "C" void rfm9x_set_packet_received_action(void (*isr)(void))
+{
+    g_radio->setPacketReceivedAction(isr);
 }
 
 // j recieve
 
-extern "C" void lora_receive_start() {
+extern "C" void lora_receive_start()
+{
     g_radio->startReceive();
 }
 
-extern "C" void lora_receive_stop() {
+extern "C" void lora_receive_stop()
+{
     g_radio->standby();
 }

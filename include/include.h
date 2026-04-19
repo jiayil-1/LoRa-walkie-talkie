@@ -25,7 +25,8 @@
 #define TX_RING_CHUNKS 8
 #define RX_RING_CHUNKS 8
 
-typedef enum {
+typedef enum
+{
     STATE_RX,
     STATE_TX
 } lora_state_t;
