@@ -5,6 +5,6 @@ void init_adc();
 void pb_isr_handler();
 void init_pb_irq();
 void init_adc_dma();
-void packet_sent_isr();
+void packet_rec_send_isr();
 
 #endif

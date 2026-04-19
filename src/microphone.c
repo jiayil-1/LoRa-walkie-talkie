@@ -33,6 +33,15 @@ void pb_isr_handler()
         return;
     }
 
+    // Simple debounce window for mechanical bounce/noise.
+    const uint64_t debounce_us = 5000;
+    uint64_t now_us = time_us_64();
+    if ((now_us - last_button_irq_us) < debounce_us)
+    {
+        return;
+    }
+    last_button_irq_us = now_us;
+
     // Use stable button level after debounce: high = pressed, low = released.
     if (events & GPIO_IRQ_EDGE_RISE)
     {
@@ -74,6 +83,7 @@ void pb_isr_handler()
 
 void init_pb_irq()
 {
+
     gpio_init(39);
     gpio_set_dir(39, GPIO_IN);
     // Keep a defined default low level (safe even with external pulldown).
@@ -115,7 +125,15 @@ void init_adc_dma()
     irq_set_enabled(DMA_IRQ_0, true);
 }
 
-void packet_sent_isr(void)
+void packet_rec_send_isr(void)
 {
-    tx_needs_finish = true;
+
+    if (state == STATE_RX)
+    {
+        rx_packet_ready = true;
+    }
+    else if (state == STATE_TX)
+    {
+        tx_needs_finish = true;
+    }
 }

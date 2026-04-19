@@ -70,10 +70,9 @@ int main()
     }
     printf("BOOT: radio init complete\n");
 
-    rfm9x_set_packet_sent_action(packet_sent_isr);
+    rfm9x_set_packet_sent_action(packet_rec_send_isr);
     printf("BOOT: packet sent ISR set\n");
 
-    rfm9x_set_packet_received_action(packet_received_isr);
     printf("BOOT: packet received ISR set\n");
 
     printf("BOOT: entering state RX\n");
@@ -85,7 +84,6 @@ int main()
         {
             if (tx_needs_finish)
             {
-                printf("isr done\n");
                 tx_needs_finish = false;
                 int16_t rc = rfm9x_finish_transmit();
                 if (rc != 0)
@@ -113,7 +111,6 @@ int main()
                 }
                 else
                 {
-                    printf("started transmit\n");
                     tx_chunk_ready[lora_read_ind] = false;
                     lora_read_ind = (lora_read_ind + 1) % TX_RING_CHUNKS;
                 }
