@@ -33,9 +33,5 @@ void pwm_push(uint8_t sample) {
 }
 
 void packet_received_isr() {
-    rfm9x_read_data(&rec_buf, CHUNK_SIZE);
-    /*printf(" %02x", rec_buf);
-    printf("\n");
-    printf("I just received a packet!!!\n");*/
-    rx_done = true;
+    rx_packet_ready = true;
 }

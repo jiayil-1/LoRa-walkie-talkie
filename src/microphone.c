@@ -2,73 +2,84 @@
 #include "microphone.h"
 
 static int dma_chan = 0;
+static volatile uint64_t last_button_irq_us = 0;
 
 void init_adc() {
     adc_init();
     adc_gpio_init(40); // GPIO 40 is ADC0
     adc_select_input(0); // Select ADC0
-    adc_set_clkdiv(5999); //48M / 6000 = 8K samples/s
+    adc_set_clkdiv(2999); // 48M / 3000 = 16K samples/s
 }
 
 static void dma_irq_handler() {
-    dma_hw->ints0 = (1u << dma_chan);    
-    dma_channel_set_write_addr(dma_chan, &dma_buf[dma_write_ind], true);
+    dma_hw->ints0 = (1u << dma_chan);
+
+    tx_chunk_ready[dma_write_ind] = true;
+
+    // one chunk = good when samples filled > chunk_size, move onto next index
+    dma_write_ind = (dma_write_ind + 1) % TX_RING_CHUNKS;
+    dma_channel_set_write_addr(dma_chan, tx_ring[dma_write_ind], false); //increment write addr
+    dma_channel_set_trans_count(dma_chan, CHUNK_SIZE, true); // transfer? 
 }
 
-
-//gp rising edge -> adc freerun 
-//gp falling edge -> end adc freerun
-
 void pb_isr_handler() {
-    //handle the rising edge and turn on the freerun adc + drain the fifo
-    if (gpio_get_irq_event_mask(39) & GPIO_IRQ_EDGE_RISE) {
-        //printf("Pushbutton is PUSHED\n");
-        tx_enable = true;
-        tx_done = true;
-        gpio_acknowledge_irq(39, GPIO_IRQ_EDGE_RISE);
-        adc_fifo_drain();
-
-        //bring dma back to life
-        dma_hw->ch[0].read_addr = (uintptr_t)&adc_hw->fifo;
-        dma_hw->ch[0].write_addr = (uintptr_t)&dma_buf[dma_write_ind];
-        dma_hw->ch[0].transfer_count = (1ul << 28) | 1ul;
-        uint32_t config = (DREQ_ADC << 17) | (0x0 << 2) | 1;
-        dma_hw->ch[0].ctrl_trig = config;
-
-        //start adc freerun until button released
-        adc_run(true);
-        state = STATE_TX;
+    uint32_t events = gpio_get_irq_event_mask(39);
+    if (!events) {
+        return;
     }
 
-    //handle the falling edge and turn off the freerun adc + drain the fifo
-    if (gpio_get_irq_event_mask(39) & GPIO_IRQ_EDGE_FALL) {
-        //printf("Pushbutton RELEASED\n");
+    // Ack all pending button events first to avoid repeated stale-edge handling.
+    gpio_acknowledge_irq(39, events);
+
+    // Simple debounce window for mechanical bounce/noise.
+    const uint64_t debounce_us = 5000;
+    uint64_t now_us = time_us_64();
+    if ((now_us - last_button_irq_us) < debounce_us) {
+        return;
+    }
+    last_button_irq_us = now_us;
+
+    // Use stable button level after debounce: high = pressed, low = released.
+    if (gpio_get(39)) {
+        tx_enable = true;
+        tx_done = true;
+        adc_run(false);
+        adc_fifo_drain();
+
+        lora_read_ind = 0;
+        dma_write_ind = 0;
+
+        memset((void *)tx_chunk_ready, 0, sizeof(tx_chunk_ready));
+
+        // Restart DMA stream into TX ring from the beginning.
+        dma_channel_set_write_addr(dma_chan, tx_ring[0], false);
+        dma_channel_set_trans_count(dma_chan, CHUNK_SIZE, true);
+
+        adc_run(true);
+        state = STATE_TX;
+    } else {
         tx_enable = false;
         rx_done = true;
-        gpio_acknowledge_irq(39, GPIO_IRQ_EDGE_FALL);
+        rx_arm_needed = true;
+        rx_packet_ready = false;
         adc_run(false);
-        //safer dma abort to avoid hanging
+
         dma_hw->abort = (1u << dma_chan);
         while (dma_hw->abort & (1u << dma_chan));
+
         adc_fifo_drain();
         state = STATE_RX;
-        memset(dma_buf, 0, CHUNK_SIZE);
     }
 }
 
 void init_pb_irq() {
-    //set pb_isr_handler as the interrupt handler
     gpio_init(39);
     gpio_set_dir(39, GPIO_IN);
-    gpio_disable_pulls(39);
-    //gpio_set_function(39)
+    // Keep a defined default low level (safe even with external pulldown).
+    gpio_pull_down(39);
     gpio_add_raw_irq_handler(39, pb_isr_handler);
-
-    //enable rising and falling edge gpios
     gpio_set_irq_enabled(39, GPIO_IRQ_EDGE_RISE, true);
     gpio_set_irq_enabled(39, GPIO_IRQ_EDGE_FALL, true);
-
-    //enable nvic interrupts
     irq_set_enabled(IO_IRQ_BANK0, true);
 }
 
@@ -76,41 +87,29 @@ void init_adc_dma() {
     //initialize DMA and turn on ADC fifo
     init_adc();
     dma_write_ind = 0;
-    lora_read_ind = 4;
+    lora_read_ind = 0;
     adc_fifo_setup(true, true, 1, false, true);
 
-    
-    dma_hw->ch[0].read_addr = (uintptr_t)&adc_hw->fifo;
-    dma_hw->ch[0].write_addr = (uintptr_t)&dma_buf[dma_write_ind];
-    dma_hw->ch[0].transfer_count = (0x1 << 28) | 1ul;
-    uint32_t config = (DREQ_ADC << 17) | (0x0 << 2) | 1;
-    dma_hw->ch[0].ctrl_trig = config;
+    dma_channel_config cfg = dma_channel_get_default_config(dma_chan);
+    channel_config_set_transfer_data_size(&cfg, DMA_SIZE_8);
+    channel_config_set_read_increment(&cfg, false); //read from same
+    channel_config_set_write_increment(&cfg, true);  // walk the chunk
+    channel_config_set_dreq(&cfg, DREQ_ADC); // based on adc
 
-    // dma_channel_config cfg = dma_channel_get_default_config(dma_chan);
-    // channel_config_set_transfer_data_size(&cfg, DMA_SIZE_8);
-    // channel_config_set_read_increment(&cfg, false);            /* always read from FIFO */
-    // channel_config_set_write_increment(&cfg, false);            /* don't increment write address */
-    // channel_config_set_dreq(&cfg, DREQ_ADC);                   /* paced by ADC */
-
-    // dma_channel_configure(dma_chan, &cfg, dma_buf[dma_write_ind], &adc_hw->fifo, CHUNK_SIZE,false);
+    dma_channel_configure(
+        dma_chan,
+        &cfg,
+        tx_ring[0], //first chunk
+        &adc_hw->fifo, 
+        CHUNK_SIZE,
+        false // button based
+    );
     dma_channel_set_irq0_enabled(dma_chan, true);
     irq_set_exclusive_handler(DMA_IRQ_0, dma_irq_handler);
     irq_set_enabled(DMA_IRQ_0, true);
     
 }
 
-
-void packet_sent_isr(void) { // lora interrupt
-    
-    
-    /*for (int i = 0; i < CHUNK_SIZE; i++) {
-                    printf(" %02x", dma_buf[i]);
-                }
-                printf("\n");*/
-    //printf("I just sent a packet!!!\n");
-    
-    tx_done = true;
-
-    dma_write_ind = (dma_write_ind + 1) % 8;
-    lora_read_ind = (lora_read_ind + 1) % 8;
+void packet_sent_isr(void) {
+    tx_needs_finish = true;
 }
