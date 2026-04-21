@@ -1,6 +1,7 @@
 #include "include.h"
 #include "microphone.h"
 #include "speaker.h"
+int ptt = 21;
 
 void init_spi()
 {
@@ -36,6 +37,12 @@ int main()
 
     init_pb_irq();
     printf("BOOT: init_pb_irq done\n");
+
+    // CHANGES HERE
+    init_pwm();
+    init_dma_speaker();
+    init_speaker_timer();
+    // CHANGES END
 
     tx_done = true;
     tx_needs_finish = false;
