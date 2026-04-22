@@ -41,7 +41,15 @@ int main()
     // CHANGES HERE
     init_pwm();
     init_dma_speaker();
-    init_speaker_timer();
+    printf("DMA ch1 ctrl:  0x%08lx\n", dma_hw->ch[1].ctrl_trig);
+    printf("DMA ch1 read:  0x%08lx\n", dma_hw->ch[1].read_addr);
+    printf("DMA ch1 write: 0x%08lx\n", dma_hw->ch[1].write_addr);
+    printf("DMA ch1 count: 0x%08lx\n", dma_hw->ch[1].transfer_count);
+    printf("DREQ_DMA_TIMER0 = %d\n",    DREQ_DMA_TIMER0);
+    printf("DMA timer frac: 0x%08lx\n", dma_hw->timer[0]);
+
+
+    
     // CHANGES END
 
     tx_done = true;
@@ -50,7 +58,7 @@ int main()
     rx_arm_needed = true;
     rx_packet_ready = false;
     memset((void *)tx_chunk_ready, 0, sizeof(tx_chunk_ready));
-    memset((void *)rx_chunk_ready, 0, sizeof(rx_chunk_ready));
+    memset((void *)rx_chunk_ready, 1, sizeof(rx_chunk_ready));
     lora_read_ind = 0;
     dma_write_ind = 0;
     rx_read_ind = 0;
@@ -144,12 +152,18 @@ int main()
                 {
                     rx_chunk_ready[rx_write_ind] = true;
                     rx_write_ind = (rx_write_ind + 1) % RX_RING_CHUNKS;
-                    printf("RX chunk[%u]: %02x %02x %02x %02x ...\n",
-                           (unsigned)((rx_write_ind + RX_RING_CHUNKS - 1) % RX_RING_CHUNKS),
-                           rx_ring[(rx_write_ind + RX_RING_CHUNKS - 1) % RX_RING_CHUNKS][0],
-                           rx_ring[(rx_write_ind + RX_RING_CHUNKS - 1) % RX_RING_CHUNKS][1],
-                           rx_ring[(rx_write_ind + RX_RING_CHUNKS - 1) % RX_RING_CHUNKS][2],
-                           rx_ring[(rx_write_ind + RX_RING_CHUNKS - 1) % RX_RING_CHUNKS][3]);
+                    if (!(dma_hw->ch[1].ctrl_trig & 1u)) {
+                        dma_channel_set_read_addr(1, &rx_ring[spk_read_chunk_ind][0], false);
+                        dma_hw->ch[1].ctrl_trig |= 1u;  // EN=1
+                        dma_channel_set_trans_count(1, 1, true);  // trigger first transfer
+                    }
+
+                    // printf("RX chunk[%u]: %02x %02x %02x %02x ...\n",
+                    //     (unsigned)((rx_write_ind + RX_RING_CHUNKS - 1) % RX_RING_CHUNKS),
+                    //     rx_ring[(rx_write_ind + RX_RING_CHUNKS - 1) % RX_RING_CHUNKS][0],
+                    //     rx_ring[(rx_write_ind + RX_RING_CHUNKS - 1) % RX_RING_CHUNKS][1],
+                    //     rx_ring[(rx_write_ind + RX_RING_CHUNKS - 1) % RX_RING_CHUNKS][2],
+                    //     rx_ring[(rx_write_ind + RX_RING_CHUNKS - 1) % RX_RING_CHUNKS][3]);
                 }
                 else
                 {

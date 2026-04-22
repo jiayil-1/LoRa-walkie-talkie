@@ -42,13 +42,11 @@
 static uint chan;
 static uint dma_spk_chan = 1;
 static uint8_t finished_idx = 0;
-
 static int SPEAKER_DELAY_US = 63;
 static void dma_read_irq_handler()
 {
-    printf("42\n");
     dma_hw->ints1 = (1u << dma_spk_chan);
-
+           
     spk_read_packet_ind++;
 
     if (spk_read_packet_ind >= CHUNK_SIZE)
@@ -68,28 +66,28 @@ static void dma_read_irq_handler()
             dma_spk_chan,
             (const volatile void *)&rx_ring[spk_read_chunk_ind][spk_read_packet_ind],
             false);
-        dma_channel_set_trans_count(dma_spk_chan, 1, false);
     }
+    dma_channel_set_trans_count(dma_spk_chan, 1, true);
 }
 
-void speaker_timer_isr()
-{
-    timer0_hw->intr = 1;
-    timer0_hw->alarm[0] = timer0_hw->timerawl + SPEAKER_DELAY_US;
-}
+// void speaker_timer_isr()
+// {
+//     timer0_hw->intr = 1;
+//     timer0_hw->alarm[0] = timer0_hw->timerawl + SPEAKER_DELAY_US;
+// }
 
-void init_speaker_timer()
-{
-    irq_set_exclusive_handler(TIMER0_IRQ_0, speaker_timer_isr);
-    // enable alarm0 interrupt for timer1
-    timer0_hw->inte = 1;
+// void init_speaker_timer()
+// {
+//     irq_set_exclusive_handler(TIMER0_IRQ_0, speaker_timer_isr);
+//     // enable alarm0 interrupt for timer1
+//     timer0_hw->inte = 1;
 
-    // enable timer1 alarm0 interrupt for arm processor
-    irq_set_enabled(TIMER0_IRQ_0, true);
+//     // enable timer1 alarm0 interrupt for arm processor
+//     irq_set_enabled(TIMER0_IRQ_0, true);
 
-    // set timer to go off in 63 us
-    timer0_hw->alarm[0] = timer0_hw->timerawl + SPEAKER_DELAY_US;
-}
+//     // set timer to go off in 63 us
+//     timer0_hw->alarm[0] = timer0_hw->timerawl + SPEAKER_DELAY_US;
+// }
 
 void init_pwm()
 {
@@ -115,16 +113,20 @@ void init_pwm()
     // irq_set_enabled(PWM_IRQ_WRAP_0, true);
 
     // set the PWM level to 0 (off)
+    pwm_set_enabled(slice_num, true);
     pwm_set_chan_level(slice_num, chan, 0);
 }
 
 void init_dma_speaker()
 {
+    dma_timer_claim(0);
+    dma_timer_set_fraction(0, 1, 9375);
+
     dma_hw->ch[1].read_addr = (uintptr_t)&rx_ring[spk_read_chunk_ind];
 
     // make pwm cc register
     dma_hw->ch[1].write_addr = (uintptr_t)&(pwm_hw->slice[slice_num].cc);
-    dma_hw->ch[1].transfer_count = (0ul << 28) | 1;
+    dma_hw->ch[1].transfer_count = (0ul << 28) | 0;
     uint32_t ctrlbits =
         (DREQ_DMA_TIMER0 << 17) | // trigger on timer0
         (0 << 12) |               // ring applies to read addr
@@ -133,7 +135,7 @@ void init_dma_speaker()
         (0x0 << 2) |              // data size = 1 byte
         1;                        // EN
     dma_hw->ch[1].ctrl_trig = ctrlbits;
-
+    dma_hw->ch[1].ctrl_trig = ctrlbits & ~1ul;
     dma_channel_set_irq1_enabled(dma_spk_chan, true);
     irq_set_exclusive_handler(DMA_IRQ_1, dma_read_irq_handler);
     irq_set_enabled(DMA_IRQ_1, true);
