@@ -1,5 +1,6 @@
 #include "include.h"
 #include "microphone.h"
+#include "TFT.h"
 
 static int dma_chan = 0;
 static volatile uint64_t last_button_irq_us = 0;
@@ -33,9 +34,9 @@ void pb_isr_handler()
         return;
     }
 
-    // Simple debounce window for mechanical bounce/noise.
-    const uint64_t debounce_us = 5000;
-    uint64_t now_us = time_us_64();
+    // debounce
+    const uint64_t debounce_us = 50000;
+    uint64_t now_us = timer_hw->timerawl;
     if ((now_us - last_button_irq_us) < debounce_us)
     {
         return;
@@ -45,6 +46,7 @@ void pb_isr_handler()
     // Use stable button level after debounce: high = pressed, low = released.
     if (events & GPIO_IRQ_EDGE_RISE)
     {
+        disp_show_state(STATE_TX);
         gpio_acknowledge_irq(39, events);
         tx_enable = true;
         tx_done = true;
@@ -55,16 +57,20 @@ void pb_isr_handler()
         dma_write_ind = 0;
 
         memset((void *)tx_chunk_ready, 0, sizeof(tx_chunk_ready));
-
+        dma_hw->abort = (1u << 1);
+        while (dma_hw->abort & (1u << 1))
+            ;
         // Restart DMA stream into TX ring from the beginning.
         dma_channel_set_write_addr(dma_chan, tx_ring[0], false);
         dma_channel_set_trans_count(dma_chan, CHUNK_SIZE, true);
 
         adc_run(true);
         state = STATE_TX;
+        
     }
     if (events & GPIO_IRQ_EDGE_FALL)
     {
+        disp_show_state(STATE_RX);
         gpio_acknowledge_irq(39, events);
         tx_enable = false;
         rx_done = true;
@@ -76,8 +82,24 @@ void pb_isr_handler()
         while (dma_hw->abort & (1u << dma_chan))
             ;
 
+        dma_hw->ch[1].read_addr = (uintptr_t)&rx_ring[spk_read_chunk_ind];
+
+    // make pwm cc register
+        dma_hw->ch[1].write_addr = (uintptr_t)&(pwm_hw->slice[slice_num].cc);
+        dma_hw->ch[1].transfer_count = (0ul << 28) | 0;
+        uint32_t ctrlbits =
+        (DREQ_DMA_TIMER0 << 17) | // trigger on timer0
+        // (0 << 12) |               // ring applies to read addr
+        // (0x3 << 8) |              // ring size every 8 bits
+        //(1ul << 4) |              // increment read
+        (0x0 << 2) |              // data size = 1 byte
+        1;                        // EN
+        dma_hw->ch[1].ctrl_trig = ctrlbits;
+        dma_hw->ch[1].ctrl_trig = ctrlbits & ~1ul;
+
         adc_fifo_drain();
         state = STATE_RX;
+        
     }
 }
 
@@ -127,7 +149,6 @@ void init_adc_dma()
 
 void packet_rec_send_isr(void)
 {
-
     if (state == STATE_RX)
     {
         rx_packet_ready = true;

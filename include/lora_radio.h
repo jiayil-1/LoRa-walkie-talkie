@@ -22,6 +22,7 @@ extern "C"
                             float rxBw, int8_t power,
                             uint16_t preambleLength);
     int16_t rfm9x_get_version(void);
+    uint8_t rfm9x_read_reg(uint8_t reg);
     int16_t rfm9x_start_receive(void);
     int16_t rfm9x_read_data(uint8_t *buf, size_t len);
     size_t rfm9x_get_packet_length(void);

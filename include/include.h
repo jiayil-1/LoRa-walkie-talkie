@@ -69,6 +69,7 @@
 #include "hardware/dma.h"
 #include "hardware/sync.h"
 #include "hardware/pwm.h"
+#include "hardware/clocks.h"
 
 #ifdef __cplusplus
 #include <RadioLib.h>
@@ -110,6 +111,7 @@ extern volatile uint8_t rx_write_ind;
 
 extern volatile uint8_t spk_read_chunk_ind;
 extern volatile uint8_t spk_read_packet_ind;
+extern uint32_t spk_staging[RX_RING_CHUNKS][CHUNK_SIZE];
 
 extern volatile bool tx_enable;
 extern volatile lora_state_t state;

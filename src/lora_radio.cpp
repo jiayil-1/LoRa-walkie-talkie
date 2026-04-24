@@ -101,6 +101,12 @@ extern "C" int16_t rfm9x_get_version(void)
     return (int16_t)g_module->SPIreadRegister(0x42);
 }
 
+extern "C" uint8_t rfm9x_read_reg(uint8_t reg)
+{
+    if (g_module == nullptr) return 0xFF;
+    return g_module->SPIreadRegister(reg);
+}
+
 extern "C" int16_t rfm9x_start_receive(void)
 {
     return g_radio->startReceive();

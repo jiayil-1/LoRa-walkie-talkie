@@ -41,6 +41,7 @@ volatile uint8_t dma_write_ind = 0;
 volatile uint8_t dma_read_ind = 0;
 volatile uint8_t spk_read_chunk_ind = 0;
 volatile uint8_t spk_read_packet_ind = 0;
+uint32_t spk_staging[RX_RING_CHUNKS][CHUNK_SIZE];
 volatile uint8_t rx_read_ind = 0;
 volatile uint8_t rx_write_ind = 0;
 
