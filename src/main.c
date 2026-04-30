@@ -12,10 +12,22 @@
 #define REG_IRQ_FLAGS_2    0x3Fu
 #define FLAG_PAYLOAD_READY 0x04u
 
+/* --------------------------------------------------------------------------
+ * Loopback test switch
+ * --------------------------------------------------------------------------
+ * Uncomment to bypass LoRa entirely and route mic ADC -> PWM speaker on the
+ * SAME board. Useful for verifying the audio in/out plumbing in isolation.
+ * Helpers live at the bottom of microphone.c and speaker.c.
+ * --------------------------------------------------------------------------
+ */
+//#define LOOPBACK_TEST
+
 int main()
 {
     uint32_t tx_log_counter = 0;
     uint32_t rx_log_counter = 0;
+    uint32_t rx_rate_count = 0;
+    uint64_t rx_rate_start_us = 0;
 
     stdio_init_all();
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -25,10 +37,42 @@ int main()
     printf("BOOT: main entered\n");
 
     init_adc_dma();
-    
-    init_pb_irq();
     init_pwm();
     init_dma_speaker();
+
+#ifdef LOOPBACK_TEST
+    printf("BOOT: LOOPBACK_TEST mode (mic -> PWM, no LoRa)\n");
+
+    tx_done            = true;
+    tx_needs_finish    = false;
+    rx_done            = false;
+    rx_arm_needed      = false;
+    rx_packet_ready    = false;
+    memset((void *)tx_chunk_ready, 0, sizeof(tx_chunk_ready));
+    memset((void *)rx_chunk_ready, 0, sizeof(rx_chunk_ready));
+    lora_read_ind        = 0;
+    dma_write_ind        = 0;
+    rx_read_ind          = 0;
+    rx_write_ind         = 0;
+    spk_read_chunk_ind   = 0;
+    spk_read_packet_ind  = 0;
+
+    mic_loopback_start();
+
+    for (;;)
+    {
+        if (tx_chunk_ready[lora_read_ind])
+        {
+            spk_loopback_push(lora_read_ind);
+            tx_chunk_ready[lora_read_ind] = false;
+            lora_read_ind = (lora_read_ind + 1) % TX_RING_CHUNKS;
+        }
+    }
+
+    return 0;
+#else
+
+    init_pb_irq();
 
     tx_done = true;
     tx_needs_finish = false;
@@ -93,7 +137,7 @@ int main()
                     printf("TX ERR: %d\n", rc);
                 }
                 else
-                {
+                {/*
                     tx_log_counter++;
                     if ((tx_log_counter % TX_LOG_EVERY_N) == 0u)
                     {
@@ -107,7 +151,7 @@ int main()
                             s1/1000u, s1%1000u,
                             s2/1000u, s2%1000u,
                             s3/1000u, s3%1000u);
-                    }
+                    }*/
                     tx_chunk_ready[lora_read_ind] = false;
                     lora_read_ind = (lora_read_ind + 1) % TX_RING_CHUNKS;
                 }
@@ -150,6 +194,24 @@ int main()
                         dma_hw->ch[1].ctrl_trig |= 1u;  // EN=1
                         dma_channel_set_trans_count(1, 1, true);  // trigger first transfer
                     }
+
+                    if (rx_rate_count == 0) {
+                        rx_rate_start_us = time_us_64();
+                    }
+                    rx_rate_count++;
+                    if (rx_rate_count == 400u) {
+                        uint64_t elapsed_us = time_us_64() - rx_rate_start_us;
+                        uint32_t total_bytes = 400u * (uint32_t)CHUNK_SIZE;
+                        uint32_t bytes_per_sec = (elapsed_us > 0)
+                            ? (uint32_t)(((uint64_t)total_bytes * 1000000ULL) / elapsed_us)
+                            : 0u;
+                        printf("RX RATE: %lu B/s (%lu bytes in %llu us)\n",
+                            (unsigned long)bytes_per_sec,
+                            (unsigned long)total_bytes,
+                            (unsigned long long)elapsed_us);
+                        rx_rate_count = 0;
+                    }
+                    /*
                     rx_log_counter++;
                     if ((rx_log_counter % RX_LOG_EVERY_N) == 0u)
                     {
@@ -159,12 +221,13 @@ int main()
                         uint32_t r2 = ((uint32_t)rx_ring[rx_idx][2] * ADC_VREF_MV) / ADC_MAX_8BIT;
                         uint32_t r3 = ((uint32_t)rx_ring[rx_idx][3] * ADC_VREF_MV) / ADC_MAX_8BIT;
                         printf("RX [%lu]: %u.%03uV %u.%03uV %u.%03uV %u.%03uV\n",
-                            (unsigned long)rx_log_counter,
-                            r0/1000u, r0%1000u,
-                            r1/1000u, r1%1000u,
-                            r2/1000u, r2%1000u,
-                            r3/1000u, r3%1000u);
+                        (unsigned long)rx_log_counter,
+                        r0/1000u, r0%1000u,
+                        r1/1000u, r1%1000u,
+                        r2/1000u, r2%1000u,
+                        r3/1000u, r3%1000u);
                     }
+                    */
                 }
                 else
                 {
@@ -176,4 +239,5 @@ int main()
     }
 
     return 0;
+#endif
 }

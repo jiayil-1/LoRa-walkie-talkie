@@ -46,7 +46,7 @@ void pb_isr_handler()
     // Use stable button level after debounce: high = pressed, low = released.
     if (events & GPIO_IRQ_EDGE_RISE)
     {
-        disp_show_state(STATE_TX);
+        // disp_show_state(STATE_TX);
         gpio_acknowledge_irq(39, events);
         tx_enable = true;
         tx_done = true;
@@ -70,7 +70,7 @@ void pb_isr_handler()
     }
     if (events & GPIO_IRQ_EDGE_FALL)
     {
-        disp_show_state(STATE_RX);
+        //disp_show_state(STATE_RX);
         gpio_acknowledge_irq(39, events);
         tx_enable = false;
         rx_done = true;
@@ -157,4 +157,39 @@ void packet_rec_send_isr(void)
     {
         tx_needs_finish = true;
     }
+}
+
+/* ============================================================================
+ * Loopback test helpers
+ * ----------------------------------------------------------------------------
+ * Anything below this banner is for the LOOPBACK_TEST path in main.c only:
+ * mic ADC -> tx_ring -> PWM speaker on the SAME board. No LoRa, no PB ISR.
+ * Safe to delete this block (and the matching prototype in microphone.h)
+ * if the loopback path is ever removed.
+ * ============================================================================
+ */
+
+void mic_loopback_start(void)
+{
+    /* Mirrors the rising-edge branch of pb_isr_handler() but runs unconditionally,
+     * so ADC streams into tx_ring without needing the push-button. */
+    tx_enable = true;
+    tx_done   = true;
+    state     = STATE_TX;
+
+    adc_run(false);
+    adc_fifo_drain();
+
+    lora_read_ind  = 0;
+    dma_write_ind  = 0;
+    memset((void *)tx_chunk_ready, 0, sizeof(tx_chunk_ready));
+
+    dma_hw->abort = (1u << dma_chan);
+    while (dma_hw->abort & (1u << dma_chan))
+        ;
+
+    dma_channel_set_write_addr(dma_chan, tx_ring[0], false);
+    dma_channel_set_trans_count(dma_chan, CHUNK_SIZE, true);
+
+    adc_run(true);
 }

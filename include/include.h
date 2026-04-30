@@ -77,7 +77,7 @@
 
 #include "lora_radio.h"
 
-#define CHUNK_SIZE 8
+#define CHUNK_SIZE 60
 #define TX_RING_CHUNKS 8
 #define RX_RING_CHUNKS 8
 

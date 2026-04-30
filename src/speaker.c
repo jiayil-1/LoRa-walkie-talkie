@@ -56,7 +56,7 @@ void init_pwm()
     pwm_config config = pwm_get_default_config();
     pwm_config_set_wrap(&config, PWRAP);
     // 125 Mhz / (clkdiv * 256) = 16khz
-    pwm_config_set_clkdiv(&config, 36.0f);
+    pwm_config_set_clkdiv(&config, 1.0f); //FIX FIX
 
     // initialize the PWM slice with the specified configuration
     pwm_init(slice_num, &config, true);
@@ -69,7 +69,7 @@ void init_pwm()
 void init_dma_speaker()
 {
     dma_timer_claim(0);
-    dma_timer_set_fraction(0, 1, 9375);
+    dma_timer_set_fraction(0, 1, 9375); // FROM 9375 -> 7813
 
     dma_hw->ch[1].read_addr = (uintptr_t)&spk_staging[spk_read_chunk_ind];
 
@@ -88,4 +88,36 @@ void init_dma_speaker()
     dma_channel_set_irq1_enabled(dma_spk_chan, true);
     irq_set_exclusive_handler(DMA_IRQ_1, dma_read_irq_handler);
     irq_set_enabled(DMA_IRQ_1, true);
+}
+
+/* ============================================================================
+ * Loopback test helpers
+ * ----------------------------------------------------------------------------
+ * Anything below this banner is for the LOOPBACK_TEST path in main.c only:
+ * mic ADC -> tx_ring -> PWM speaker on the SAME board. No LoRa.
+ * Safe to delete this block (and the matching prototype in speaker.h)
+ * if the loopback path is ever removed.
+ * ============================================================================
+ */
+
+void spk_loopback_push(uint8_t chunk_idx)
+{
+    /* Stage one mic chunk into the speaker buffer, then kick the speaker
+     * DMA if it has gone idle. Same arming pattern as the RX branch in main.c,
+     * just sourced from tx_ring instead of rx_ring. */
+    for (int i = 0; i < CHUNK_SIZE; i++)
+    {
+        spk_staging[chunk_idx][i] = (uint32_t)tx_ring[chunk_idx][i];
+    }
+    rx_chunk_ready[chunk_idx] = true;
+
+    if (!(dma_hw->ch[dma_spk_chan].ctrl_trig & 1u))
+    {
+        dma_channel_set_read_addr(
+            dma_spk_chan,
+            &spk_staging[spk_read_chunk_ind][spk_read_packet_ind],
+            false);
+        dma_hw->ch[dma_spk_chan].ctrl_trig |= 1u;
+        dma_channel_set_trans_count(dma_spk_chan, 1, true);
+    }
 }

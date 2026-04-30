@@ -19,4 +19,7 @@ void pwm_push();
 void init_pwm();
 void init_speaker_timer();
 void init_dma_speaker();
+
+/* Loopback test (mic -> PWM on same board). See bottom of speaker.c. */
+void spk_loopback_push(uint8_t chunk_idx);
 #endif
